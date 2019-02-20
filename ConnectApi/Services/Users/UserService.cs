@@ -94,7 +94,8 @@ namespace ConnectApi.Services.Users
 
         public async Task<List<User>> GetAllUsers()
         {
-            return await _context.Users.ToListAsync();
+            var users = await _context.Users.ToListAsync();
+            return users;
         }
 
         public async Task<User> GetUserByPhoneNumber(string phonenumber)
@@ -313,6 +314,28 @@ namespace ConnectApi.Services.Users
             return false;
         }
 
+        public async Task<bool> ChangeStatusInActiveForAllContactsWhereUserIsSaved(string phoneNumber)
+        {
+            if (!string.IsNullOrEmpty(phoneNumber))
+            {
+                var contacts = await _context.Contacts.Where(x => x.PhoneNumber.Equals(phoneNumber)).ToListAsync();
+                if (contacts != null)
+                {
+                    foreach (var contact in contacts)
+                    {
+                        contact.Status = true;
+                        _context.Contacts.Update(contact);
+                    }
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
+        }
+
         public async Task<List<Contact>> GetAllUserContacts(int userId)
         {
             if (userId != 0)
@@ -330,12 +353,28 @@ namespace ConnectApi.Services.Users
         }
 
 
-        public async Task<bool> ChangeUserActiveStatusInDb(int userId)
+        public async Task<bool> ChangeUserActiveStatusInDb(int userId,DateTime loginTime)
         {
             var user = await GetUserById(userId);
             if (user != null)
             {
                 user.Status = true;
+                user.LoginDateTime = loginTime;
+                await UpdateUserInDb(user);
+                return true;
+            }
+
+            return false;
+        }
+
+        public async Task<bool> ChangeUserInActiveStatusInDb(int userId, DateTime loginTime)
+        {
+            var user = await GetUserById(userId);
+            if (user != null)
+            {
+                user.Status = false;
+                await ChangeStatusInActiveForAllContactsWhereUserIsSaved(user.PhoneNumber);
+                user.LoginDateTime = loginTime;
                 await UpdateUserInDb(user);
                 return true;
             }
@@ -347,17 +386,84 @@ namespace ConnectApi.Services.Users
         {
             if (user != null)
             {
-                var userInDb = await GetUserById(user.Id);
-                if (userInDb != null)
-                {
-                    _context.Users.Update(userInDb);
-                    await _context.SaveChangesAsync();
-                    return true;
-                }
-
-                return false;
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+                return true;
             }
 
+            return false;
+        }
+
+        public async Task<bool> UserLogout(int userId)
+        {
+            if (userId != 0)
+            {
+                await ChangeUserInActiveStatusInDb(userId,DateTime.UtcNow);
+                return true;
+            }
+
+            return false;
+        }
+
+        public async Task ChangeStatusForUsersWithActiveTime()
+        {
+            var users = await GetAllUsers();
+            foreach (var user in users)
+            {
+                if (DateTime.UtcNow > user.LoginDateTime.AddMinutes(user.ActiveShowTime))
+                {
+                    await ChangeUserInActiveStatusInDb(user.Id, user.LoginDateTime);
+                }
+            }
+        }
+
+        public async Task MarkAsFriend(int userId)
+        {
+            var user = await GetUserById(userId);
+            var contacts = await GetAllUserContacts(userId);
+            if (contacts != null)
+            {
+                foreach (var contact in contacts)
+                {
+                    if (contact != null)
+                    {
+                        var userContact = await GetUserByPhoneNumber(contact.PhoneNumber);
+                        if (userContact != null)
+                        {
+                            var userContacts = await GetAllUserContacts(userContact.Id);
+                            foreach (var userContactUser in userContacts)
+                            {
+                                if (userContactUser != null)
+                                {
+                                    if (userContactUser.PhoneNumber.Equals(user.PhoneNumber))
+                                    {
+                                        contact.Friend = true;
+                                        userContactUser.Friend = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+           
+        }
+
+        public async Task<bool> AddContacts(List<Contact> contacts, int userId)
+        {
+            var user = await GetUserById(userId);
+            if (contacts != null)
+            {
+                foreach (var contact in contacts)
+                {
+                    if (contact != null && contact.UserId != 0)
+                    {
+                        await _context.Contacts.AddAsync(contact);
+                    }
+                }
+
+                return true;
+            }
             return false;
         }
     }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using ConnectApi.Models.Contacts;
 using ConnectApi.Models.UserOtpInfo;
@@ -30,8 +31,15 @@ namespace ConnectApi.Services.Users
         Task<User> GetActiveUserByUserId(int userId);
         Task<bool> ChangeStatusForAllContactsWhereUserIsSaved(string phoneNumber);
 
-        Task<bool> ChangeUserActiveStatusInDb(int userId);
+        Task<bool> ChangeUserActiveStatusInDb(int userId,DateTime loginTime);
+        Task<bool> ChangeUserInActiveStatusInDb(int userId, DateTime loginTime);
         Task<bool> UpdateUserInDb(User user);
+
+        Task<bool> UserLogout(int userId);
+        Task<bool> ChangeStatusInActiveForAllContactsWhereUserIsSaved(string phoneNumber);
+        Task ChangeStatusForUsersWithActiveTime();
+        Task MarkAsFriend(int userId);
+        Task<bool> AddContacts(List<Contact> contacts, int userId);
 
     }
 }

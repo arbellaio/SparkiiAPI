@@ -15,6 +15,7 @@ using ConnectApi.Helpers.JwtTokenGen;
 using ConnectApi.Helpers.TwilioSendSmsWeb;
 using ConnectApi.Models.Users;
 using ConnectApi.Services.Users;
+using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -45,6 +46,7 @@ namespace ConnectApi.Controllers.Users
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UserLoginDto userLoginDto)
         {
+
             if (!ModelState.IsValid)
                 return BadRequest(new
                 {
@@ -87,7 +89,7 @@ namespace ConnectApi.Controllers.Users
             }
 
             // Change User Status
-            var status = await _service.ChangeUserActiveStatusInDb(userInDb.Id);
+            var status = await _service.ChangeUserActiveStatusInDb(userInDb.Id,DateTime.UtcNow);
             var changeContactStatusResponse = await _service.ChangeStatusForAllContactsWhereUserIsSaved(userInDb.PhoneNumber);
             var notificationSendResponse = await _service.SendPushNotificationToAllActiveContactsOnStatusActive(userInDb.Id);
 
@@ -411,6 +413,126 @@ namespace ConnectApi.Controllers.Users
                 UserId = createdUser.Id,
                 Token = tokenStringJwt,
                 Response = new JsonResponseHandler { IsSuccess = true }
+            });
+        }
+
+
+
+        //Logout User
+        [AllowAnonymous]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout([FromBody] UserLogoutDto loginDto)
+        {
+            if (loginDto.Id == 0)
+            {
+                return BadRequest(new
+                {
+                    Response = new JsonResponseHandler { ErrorMessage = AppStrings.UserIdisInvalid, IsSuccess = false, }
+                });
+            }
+
+            var responseLogout = await _service.UserLogout(loginDto.Id);
+            if (!responseLogout)
+            {
+                return BadRequest(new
+                {
+                    Response = new JsonResponseHandler { ErrorMessage = "Error Cant Logout", IsSuccess = false, }
+                });
+            }
+            return Ok(new
+            {
+                Response = new JsonResponseHandler
+                {
+                    IsSuccess = true,
+                }
+            });
+        }
+
+
+        //Logout User
+        [AllowAnonymous]
+        [HttpPost("updateuser")]
+        public async Task<IActionResult> UpdateUser([FromBody] UserResponseDto loginDto)
+        {
+            if (loginDto.Id == 0)
+            {
+                return BadRequest(new
+                {
+                    Response = new JsonResponseHandler { ErrorMessage = AppStrings.UserIdisInvalid, IsSuccess = false, }
+                });
+            }
+
+            var user = await _service.GetUserById(loginDto.Id);
+
+            user.ActiveShowTime = loginDto.ActiveShowTime;
+            user.Contacts = loginDto.Contacts;
+            user.OneSignalUserId = loginDto.OneSignalUserId;
+            user.TwilioUserId = loginDto.TwilioUserId;
+            user.Status = loginDto.Status;
+            user.PhoneNumber = loginDto.PhoneNumber;
+           
+            return Ok(new
+            {
+                Response = new JsonResponseHandler
+                {
+                    IsSuccess = true,
+                }
+            });
+        }
+
+
+        //Verify OtpCode
+        [AllowAnonymous]
+        [HttpPost("uploadcontacts")]
+        public async Task<IActionResult> UploadContact([FromBody] UploadContactsDto getOtp)
+        {
+
+            if (getOtp != null)
+            {
+                if (getOtp.Contacts != null && getOtp.Contacts.Count > 0 && getOtp.UserId != 0)
+                {
+                     var response = await _service.AddContacts(getOtp.Contacts, getOtp.UserId);
+                    if (response)
+                    {
+                        return Ok(new
+                        {
+                            Response = new JsonResponseHandler
+                            {
+                                IsSuccess = true,
+                            }
+                        });
+                    }
+                    else
+                    {
+                        return Ok(new
+                        {
+                            Response = new JsonResponseHandler
+                            {
+                                IsSuccess = false,
+                                ErrorMessage = "Couldn't Upload"
+                            }
+                        });
+                    }
+
+                }
+                return Ok(new
+                {
+                    Response = new JsonResponseHandler
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "Either Contacts are null or User Id is 0"
+                    }
+                });
+
+            }
+
+            return Ok(new
+            {
+                Response = new JsonResponseHandler
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Upload Dto Object is Null"
+                }
             });
         }
 

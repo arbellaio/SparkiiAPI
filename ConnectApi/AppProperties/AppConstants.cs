@@ -20,8 +20,9 @@ namespace ConnectApi.AppProperties
         public const string AppSecretKey = "SparkiiSecretKey";
         public const int TokenHandlerSize = 1;
         public const int TokenExpireTimeDuration= 9999;
+        public string Secret { get; set; }
 
-       
+
 
         //One API Key and AppId
         public const string OneSignalAppId = "3399eeba-1516-4e78-8867-d2eee5a0a4ed";

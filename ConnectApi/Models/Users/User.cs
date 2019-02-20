@@ -19,6 +19,8 @@ namespace ConnectApi.Models.Users
         public string TwilioUserId { get; set; }
         public string OneSignalUserId { get; set; }
         public DateTime CreatedDate { get; set; }
+        public string DeviceId { get; set; }
+        public DateTime LoginDateTime { get; set; }
         public bool Status { get; set; }
         public virtual List<Contact> Contacts { get; set; }
     }
